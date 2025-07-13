@@ -1,46 +1,43 @@
 const express = require('express');
-const line = require('@line/bot-sdk');
-require('dotenv').config();
+const { middleware, Client } = require('@line/bot-sdk');
+
+const app = express();
 
 const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.LINE_CHANNEL_SECRET,
+  channelSecret: process.env.LINE_CHANNEL_SECRET
 };
 
-const app = express();
-app.use(express.json());
+const client = new Client(config);
 
-const client = new line.Client(config);
+app.use(middleware(config));
 
-// Webhook エンドポイント
-app.post('/webhook', line.middleware(config), (req, res) => {
-  if (!req.body.events || !Array.isArray(req.body.events)) {
-    console.error('イベントが不正です');
-    return res.status(400).end();
-  }
+// Webhook受信処理
+app.post('/webhook', (req, res) => {
+  console.log('📩 Webhook received:', JSON.stringify(req.body.events));
 
-  Promise
-    .all(req.body.events.map(handleEvent))
-    .then((result) => res.json(result))
-    .catch((err) => {
-      console.error('エラー:', err);
-      res.status(500).end();
-    });
+  Promise.all(req.body.events.map(async (event) => {
+    if (event.type === 'message' && event.message.type === 'text') {
+      await client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: `＜くまお先生：『${event.message.text}』に答えたよ！＞`
+      });
+    }
+  }))
+  .then(() => res.status(200).end())
+  .catch((err) => {
+    console.error('❌ Error:', err);
+    res.status(500).end();
+  });
 });
 
-// イベントハンドラ
-function handleEvent(event) {
-  if (event.type !== 'message' || !event.message || event.message.type !== 'text') {
-    return Promise.resolve(null);
-  }
+// 動作確認用ルート
+app.get('/', (req, res) => {
+  res.send('くまお先生は起動中です！');
+});
 
-  return client.replyMessage(event.replyToken, {
-    type: 'text',
-    text: `＜くまお先生：『${event.message.text}』に答えたよ！＞`
-  });
-}
-
-const port = process.env.PORT || 3000;
+// Renderが使うポート
+const port = process.env.PORT || 10000;
 app.listen(port, () => {
-  console.log(`listening on ${port}`);
+  console.log(`✅ サーバー起動中: http://localhost:${port}`);
 });
