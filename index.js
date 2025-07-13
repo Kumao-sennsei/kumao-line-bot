@@ -1,66 +1,37 @@
-const express = require('express');
-const { Client } = require('@line/bot-sdk');
-const dotenv = require('dotenv');
-const crypto = require('crypto');
+require('dotenv').config();  // ← これが超重要！！
 
-dotenv.config();
+const line = require('@line/bot-sdk');
+const express = require('express');
 
 const config = {
-  channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.CHANNEL_SECRET
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+  channelSecret: process.env.LINE_CHANNEL_SECRET
 };
 
-const client = new Client(config);
+const client = new line.Client(config);
 const app = express();
 
-// ✅ LINE署名検証のための rawBody を取得
-app.use(express.json({
-  verify: (req, res, buf) => {
-    req.rawBody = buf;
-  }
-}));
-
-// ✅ Webhook受信＆署名検証付き
-app.post('/webhook', (req, res) => {
-  const signature = req.headers['x-line-signature'];
-  const body = req.rawBody;
-
-  // ハッシュ生成（署名検証）
-  const hash = crypto
-    .createHmac('SHA256', config.channelSecret)
-    .update(body)
-    .digest('base64');
-
-  if (hash !== signature) {
-    return res.status(401).send('Unauthorized');
-  }
-
-  const events = req.body.events;
-  Promise
-    .all(events.map(handleEvent))
-    .then(() => res.status(200).send('OK'))
-    .catch((err) => {
+app.post('/webhook', line.middleware(config), (req, res) => {
+  Promise.all(req.body.events.map(handleEvent))
+    .then(result => res.json(result))
+    .catch(err => {
       console.error(err);
       res.status(500).end();
     });
 });
 
-// ✅ メッセージ応答処理
 function handleEvent(event) {
   if (event.type !== 'message' || event.message.type !== 'text') {
     return Promise.resolve(null);
   }
 
-  const replyMessage = {
+  return client.replyMessage(event.replyToken, {
     type: 'text',
-    text: `くまお先生: 「${event.message.text}」ですね！よい質問です✨`
-  };
-
-  return client.replyMessage(event.replyToken, replyMessage);
+    text: 'くまお先生: 『' + event.message.text + '』に答えたよ！'
+  });
 }
 
-// ✅ サーバー起動
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log(`🚀 Server running on port ${port}`);
+  console.log(`Server running on ${port}`);
 });
