@@ -1,13 +1,11 @@
-// ✅ Vision対応LINE Bot（最新版）
 require('dotenv').config();
 const line = require('@line/bot-sdk');
 const express = require('express');
 const axios = require('axios');
-const fs = require('fs');
 
 const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.LINE_CHANNEL_SECRET,
+  channelSecret: process.env.LINE_CHANNEL_SECRET
 };
 
 const app = express();
@@ -27,17 +25,10 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
 async function handleEvent(event) {
   if (event.type !== 'message') return null;
 
-  if (event.message.type === 'image') {
+  // 📸 Vision対応：画像URLをテキストで送信したときだけ
+  if (event.message.type === 'text' && event.message.text.startsWith('http')) {
     try {
-      const stream = await client.getMessageContent(event.message.id);
-      const filePath = `/tmp/${event.message.id}.jpg`;
-      const writable = fs.createWriteStream(filePath);
-      stream.pipe(writable);
-
-      await new Promise((resolve) => writable.on('finish', resolve));
-
-      const imageData = fs.readFileSync(filePath);
-      const base64Image = imageData.toString('base64');
+      const imageUrl = event.message.text.trim();
 
       const response = await axios.post(
         'https://api.openai.com/v1/chat/completions',
@@ -48,39 +39,42 @@ async function handleEvent(event) {
               role: 'user',
               content: [
                 { type: 'text', text: 'この画像について教えてください。' },
-                {
-                  type: 'image_url',
-                  image_url: { url: `data:image/jpeg;base64,${base64Image}` },
-                },
-              ],
-            },
+                { type: 'image_url', image_url: { url: imageUrl } }
+              ]
+            }
           ],
-          max_tokens: 1000,
+          max_tokens: 1000
         },
         {
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          },
+            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+          }
         }
       );
 
       const answer = response.data.choices[0].message.content;
-      return client.replyMessage(event.replyToken, { type: 'text', text: answer });
-    } catch (error) {
-      console.error('Image processing error:', error);
+
       return client.replyMessage(event.replyToken, {
         type: 'text',
-        text: '画像の処理中にエラーが発生しました。',
+        text: answer
+      });
+
+    } catch (error) {
+      console.error('Vision API Error:', error.message);
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '画像解析中にエラーが発生しました…(T_T)'
       });
     }
   }
 
+  // 🧠 テキスト返信
   if (event.message.type === 'text') {
     const reply = `くまお先生：「${event.message.text}」に答えたよ！`;
     return client.replyMessage(event.replyToken, {
       type: 'text',
-      text: reply,
+      text: reply
     });
   }
 
