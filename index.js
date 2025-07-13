@@ -4,15 +4,20 @@ require('dotenv').config();
 
 const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.LINE_CHANNEL_SECRET
+  channelSecret: process.env.LINE_CHANNEL_SECRET,
 };
 
 const app = express();
 app.use(express.json());
+
 app.post('/webhook', line.middleware(config), (req, res) => {
   Promise
     .all(req.body.events.map(handleEvent))
-    .then(result => res.json(result));
+    .then((result) => res.json(result))
+    .catch((err) => {
+      console.error('エラー:', err);
+      res.status(500).end();
+    });
 });
 
 const client = new line.Client(config);
@@ -24,7 +29,7 @@ function handleEvent(event) {
 
   return client.replyMessage(event.replyToken, {
     type: 'text',
-    text: 'くまお先生: 「' + event.message.text + '」って言ったね！(●´ω｀●)'
+    text: `くまお先生：『${event.message.text}』って言ったね！(●´ω｀●)`
   });
 }
 
