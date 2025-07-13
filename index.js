@@ -1,5 +1,6 @@
 const express = require('express');
 const line = require('@line/bot-sdk');
+require('dotenv').config();
 
 const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
@@ -9,13 +10,17 @@ const config = {
 const app = express();
 app.use(express.json());
 
+const client = new line.Client(config);
+
+// Webhook エンドポイント
 app.post('/webhook', line.middleware(config), (req, res) => {
   if (!req.body.events || !Array.isArray(req.body.events)) {
     console.error('イベントが不正です');
     return res.status(400).end();
   }
 
-  Promise.all(req.body.events.map(handleEvent))
+  Promise
+    .all(req.body.events.map(handleEvent))
     .then((result) => res.json(result))
     .catch((err) => {
       console.error('エラー:', err);
@@ -23,8 +28,7 @@ app.post('/webhook', line.middleware(config), (req, res) => {
     });
 });
 
-const client = new line.Client(config);
-
+// イベントハンドラ
 function handleEvent(event) {
   if (event.type !== 'message' || !event.message || event.message.type !== 'text') {
     return Promise.resolve(null);
