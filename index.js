@@ -25,7 +25,7 @@ const imageToBase64 = async (messageId) => {
   return Buffer.from(response.data).toString('base64');
 };
 
-// OpenAI Vision API
+// OpenAI Vision API 呼び出し
 const callOpenAIWithImage = async (base64, promptText = '') => {
   const result = await axios.post(
     'https://api.openai.com/v1/chat/completions',
@@ -49,22 +49,24 @@ const callOpenAIWithImage = async (base64, promptText = '') => {
     },
     {
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
     }
   );
-  return result.data.choices[0].message.content;
+
+  // ✅ Visionは message.content が配列
+  return result.data.choices[0].message.content[0].text;
 };
 
-// Webhookルート
+// webhookルート
 app.post('/webhook', line.middleware(config), async (req, res) => {
   const events = req.body.events;
 
   for (const event of events) {
     if (event.type === 'message') {
       const message = event.message;
-      let reply = 'AIくまお先生が考え中です...';
+      let reply = 'AIくまお先生が考え中です…';
 
       try {
         if (message.type === 'image') {
@@ -74,6 +76,7 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
           reply = await callOpenAIWithImage('', message.text);
         }
       } catch (err) {
+        console.error('エラー:', err);
         reply = '画像の処理中にエラーが発生しました。';
       }
 
