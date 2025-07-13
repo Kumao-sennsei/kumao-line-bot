@@ -1,10 +1,10 @@
 const express = require('express');
-const line = require('@line/bot-sdk');
+const line = require('@line/bot-sdk'); // ← ここ間違ってない！👍
 require('dotenv').config();
 
 const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.LINE_CHANNEL_SECRET,
+  channelSecret: process.env.LINE_CHANNEL_SECRET
 };
 
 const app = express();
@@ -23,17 +23,18 @@ app.post('/webhook', line.middleware(config), (req, res) => {
 const client = new line.Client(config);
 
 function handleEvent(event) {
+  // 正しい条件分岐！ text以外は無視する
   if (event.type !== 'message' || event.message.type !== 'text') {
     return Promise.resolve(null);
   }
 
   return client.replyMessage(event.replyToken, {
     type: 'text',
-    text: `くまお先生：『${event.message.text}』って言ったね！(●´ω｀●)`
+    text: `＜くまお先生：『${event.message.text}』に答えたよ！`
   });
 }
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 10000;
 app.listen(port, () => {
-  console.log(`Listening on ${port}`);
+  console.log(`listening on ${port}`);
 });
